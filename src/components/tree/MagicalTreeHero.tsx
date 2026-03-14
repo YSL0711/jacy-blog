@@ -5,7 +5,7 @@ import { AddOrnamentDialog } from "./AddOrnamentDialog";
 import { ViewOrnamentDialog } from "./ViewOrnamentDialog";
 import { TreeSnowfall } from "./TreeSnowfall";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Plus } from "lucide-react";
+import { Sparkles, Plus, Star, Clock, Heart } from "lucide-react";
 import { toast } from "sonner";
 import watercolorTree from "@/assets/watercolor-tree.png";
 
@@ -27,6 +27,8 @@ export const MagicalTreeHero = () => {
   const [selectedOrnament, setSelectedOrnament] = useState<Ornament | null>(null);
   const [newOrnamentId, setNewOrnamentId] = useState<string | null>(null);
   const [treeDimensions, setTreeDimensions] = useState({ width: 400, height: 512 });
+  const [filterMode, setFilterMode] = useState<"all" | "my" | "recent">("all");
+  const [myOrnaments, setMyOrnaments] = useState<string[]>([]);
 
   // Fetch ornaments
   const fetchOrnaments = useCallback(async () => {
@@ -78,12 +80,22 @@ export const MagicalTreeHero = () => {
   // Fetch ornaments on mount
   useEffect(() => {
     fetchOrnaments();
+    // Load my ornaments from local storage
+    const saved = JSON.parse(localStorage.getItem('myOrnaments') || '[]');
+    setMyOrnaments(saved);
   }, [fetchOrnaments]);
 
-  const handleOrnamentAdded = async () => {
+  const handleOrnamentAdded = async (newId?: string) => {
     await fetchOrnaments();
+    
+    if (newId) {
+      setNewOrnamentId(newId);
+      setMyOrnaments(prev => [...prev, newId]);
+      setTimeout(() => setNewOrnamentId(null), 1000);
+      return;
+    }
 
-    // Find the newest ornament to animate
+    // Fallback Find the newest ornament to animate
     const { data } = await supabase
       .from("ornaments")
       .select("id")
@@ -133,6 +145,17 @@ export const MagicalTreeHero = () => {
     return { x: Math.round(x), y: Math.round(y) };
   };
 
+  // Filter the ornaments
+  const filteredOrnaments = ornaments.filter(ornament => {
+    if (filterMode === "my") return myOrnaments.includes(ornament.id);
+    if (filterMode === "recent") {
+      // Show top 10 most recent
+      const recentIds = ornaments.slice(-10).map(o => o.id);
+      return recentIds.includes(ornament.id);
+    }
+    return true; // "all"
+  });
+
   return (
     <section className="relative min-h-screen bg-[#FDF8F2] overflow-hidden pt-28 md:pt-32 lg:pt-40" id="decorate-tree">
       {/* Subtle snowfall */}
@@ -145,11 +168,39 @@ export const MagicalTreeHero = () => {
           <h1 className="font-elegant text-5xl md:text-7xl text-christmas-green mb-4">
             Decorate the Tree
           </h1>
-          <p className="font-sans text-lg md:text-xl text-warm-grey/70 leading-relaxed">
+          <p className="font-sans text-lg md:text-xl text-warm-grey/70 leading-relaxed mb-6">
             This season, every story belongs on the tree.
             <br />
             Add your memory and place it anywhere you like.
           </p>
+
+          {/* Filters */}
+          <div className="flex flex-wrap justify-center gap-2 mb-4">
+            <Button 
+              variant={filterMode === "all" ? "default" : "outline"} 
+              size="sm" 
+              onClick={() => setFilterMode("all")}
+              className={`rounded-full ${filterMode === "all" ? "bg-christmas-green/90" : "text-foreground"}`}
+            >
+              <Star className="w-3 h-3 mr-1" /> All
+            </Button>
+            <Button 
+              variant={filterMode === "my" ? "default" : "outline"} 
+              size="sm" 
+              onClick={() => setFilterMode("my")}
+              className={`rounded-full ${filterMode === "my" ? "bg-ornament-cranberry/90" : "text-foreground"}`}
+            >
+              <Heart className="w-3 h-3 mr-1" /> My Ornaments
+            </Button>
+            <Button 
+              variant={filterMode === "recent" ? "default" : "outline"} 
+              size="sm" 
+              onClick={() => setFilterMode("recent")}
+              className={`rounded-full ${filterMode === "recent" ? "bg-ornament-gold/90 text-primary-foreground" : "text-foreground"}`}
+            >
+              <Clock className="w-3 h-3 mr-1" /> Recent
+            </Button>
+          </div>
         </div>
 
         {/* Tree container with ornaments */}
@@ -177,11 +228,12 @@ export const MagicalTreeHero = () => {
           />
 
           {/* Draggable ornaments overlay */}
-          {ornaments.map((ornament) => (
+          {filteredOrnaments.map((ornament) => (
             <DraggableOrnament
               key={ornament.id}
               ornament={ornament}
               isNew={newOrnamentId === ornament.id}
+              isMine={myOrnaments.includes(ornament.id)}
               onDragStop={(e, data) => handleDragStop(ornament.id, e, data)}
               onClick={() => {
                 setSelectedOrnament(ornament);
@@ -234,6 +286,7 @@ export const MagicalTreeHero = () => {
 interface DraggableOrnamentProps {
   ornament: Ornament;
   isNew: boolean;
+  isMine?: boolean;
   onDragStop: (e: DraggableEvent, data: DraggableData) => void;
   onClick: () => void;
   containerWidth: number;
@@ -243,6 +296,7 @@ interface DraggableOrnamentProps {
 const DraggableOrnament = ({
   ornament,
   isNew,
+  isMine,
   onDragStop,
   onClick,
   containerWidth,
@@ -251,6 +305,7 @@ const DraggableOrnament = ({
   const nodeRef = useRef<HTMLButtonElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showSparkle, setShowSparkle] = useState(isNew);
+  const dragStartPos = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     if (isNew) {
@@ -264,10 +319,50 @@ const DraggableOrnament = ({
     <Draggable
       nodeRef={nodeRef}
       position={{ x: 0, y: 0 }}
-      onStart={() => setIsDragging(true)}
-      onStop={(e, data) => {
+      onStart={(e: DraggableEvent) => {
+        setIsDragging(true);
+        // Record starting position for touch devices
+        if (e.type === "touchstart") {
+          const touchEvent = e as unknown as React.TouchEvent;
+          dragStartPos.current = {
+            x: touchEvent.touches[0].clientX,
+            y: touchEvent.touches[0].clientY,
+          };
+        } else if (e.type === "mousedown") {
+          const mouseEvent = e as unknown as React.MouseEvent;
+          dragStartPos.current = {
+            x: mouseEvent.clientX,
+            y: mouseEvent.clientY,
+          };
+        }
+      }}
+      onStop={(e: DraggableEvent, data: DraggableData) => {
         setIsDragging(false);
         onDragStop(e, data);
+        
+        // Calculate distance moved to differentiate drag from tap
+        let endX = data.x, endY = data.y;
+        if (e.type === "touchend") {
+           const touchEvent = e as unknown as React.TouchEvent;
+           if (touchEvent.changedTouches && touchEvent.changedTouches.length > 0) {
+              endX = touchEvent.changedTouches[0].clientX;
+              endY = touchEvent.changedTouches[0].clientY;
+           }
+        } else if (e.type === "mouseup") {
+           const mouseEvent = e as unknown as React.MouseEvent;
+           endX = mouseEvent.clientX;
+           endY = mouseEvent.clientY;
+        }
+
+        const distance = Math.sqrt(
+          Math.pow(endX - dragStartPos.current.x, 2) +
+          Math.pow(endY - dragStartPos.current.y, 2)
+        );
+
+        // If moved less than 5 pixels, treat as a click
+        if (distance < 5) {
+          onClick();
+        }
       }}
       bounds={{
         left: -ornament.position_x + 20,
@@ -278,12 +373,6 @@ const DraggableOrnament = ({
     >
       <button
         ref={nodeRef}
-        onClick={(e) => {
-          // Only trigger click if not dragging
-          if (!isDragging) {
-            onClick();
-          }
-        }}
         className={`absolute text-4xl cursor-grab active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-candlelight focus:ring-offset-2 rounded-full p-1 transition-all duration-200 group ${
           isNew ? "animate-ornament-fall" : ""
         } ${isDragging ? "scale-110 z-50" : "hover:scale-110"}`}
@@ -304,6 +393,13 @@ const DraggableOrnament = ({
           {showSparkle && (
             <span className="absolute -top-2 -right-2 text-lg animate-sparkle-burst">
               ✨
+            </span>
+          )}
+
+          {/* "My" Ornament Indicator */}
+          {isMine && !showSparkle && (
+            <span className="absolute -bottom-1 -right-1 text-xs bg-card rounded-full shadow-sm border border-border">
+              💖
             </span>
           )}
         </span>

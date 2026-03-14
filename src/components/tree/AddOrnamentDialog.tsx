@@ -20,7 +20,7 @@ interface AddOrnamentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   position: { x: number; y: number };
-  onSuccess: () => void;
+  onSuccess: (newId?: string) => void;
 }
 
 
@@ -77,21 +77,27 @@ export const AddOrnamentDialog = ({
     try {
       const passcodeHash = await hashPasscode(passcode);
 
-      const { error } = await supabase.from("ornaments").insert({
+      const { data, error } = await supabase.from("ornaments").insert({
         emoji,
         nickname: nickname.trim(),
         passcode_hash: passcodeHash,
         note: note.trim() || null,
         position_x: position.x,
         position_y: position.y,
-      });
+      }).select().single();
 
       if (error) throw error;
+      
+      if (data && data.id) {
+        const myOrnaments = JSON.parse(localStorage.getItem('myOrnaments') || '[]');
+        myOrnaments.push(data.id);
+        localStorage.setItem('myOrnaments', JSON.stringify(myOrnaments));
+      }
 
       toast.success("Your ornament is glowing 🎁", {
         description: "Thank you for adding your sparkle to the tree!",
       });
-      onSuccess();
+      onSuccess(data?.id);
       onOpenChange(false);
       resetForm();
     } catch (error) {

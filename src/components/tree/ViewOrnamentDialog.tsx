@@ -41,7 +41,7 @@ export const ViewOrnamentDialog = ({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const MASTER_KEY = "yudeestar";
+  const MASTER_KEY = "qorgusfh";
 
   const handleUnlock = async () => {
     if (!ornament) return;
