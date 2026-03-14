@@ -40,7 +40,7 @@ export const SantaTracker = () => {
           )}
 
           {/* NORAD Tracker Embed */}
-          <div className="aspect-video w-full">
+          <div className="w-full h-[65vh] md:h-[600px] lg:h-[700px]">
             <iframe
               id="norad-iframe"
               src="https://www.noradsanta.org/en/map"
