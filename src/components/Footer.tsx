@@ -28,7 +28,7 @@ export const Footer = () => {
           <span className="animate-twinkle" style={{ animationDelay: "2s" }}>⭐</span>
         </div>
         <p className="text-sm text-primary-foreground/50 font-display">
-          © 2025 JACY's Christmas Blog. Made with love.
+          © {new Date().getFullYear()} JACY's Christmas Blog. Made with love.
         </p>
       </div>
     </footer>

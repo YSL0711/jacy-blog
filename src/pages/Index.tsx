@@ -1,5 +1,6 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { Countdown } from "@/components/Countdown";
 import { MagicalTreeHero } from "@/components/tree/MagicalTreeHero";
 import { SantaTracker } from "@/components/SantaTracker";
 import { BlogPreview } from "@/components/BlogPreview";
@@ -16,6 +17,9 @@ const Index = () => {
       <CelestialSleigh />
       
       <Header />
+
+      {/* Countdown Section */}
+      <Countdown />
       
       {/* Magical Tree Hero Section */}
       <MagicalTreeHero />
